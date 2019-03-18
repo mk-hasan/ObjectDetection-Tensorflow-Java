@@ -49,6 +49,7 @@
             <artifactId>javacv</artifactId>
             <version>${javacv.version}</version>
         </dependency>
+
     </dependencies>
 
 </project>

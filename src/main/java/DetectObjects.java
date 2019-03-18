@@ -19,40 +19,115 @@ import java.util.Map;
 import java.util.Stack;
 import javax.imageio.ImageIO;
 
-import org.bytedeco.javacv.FFmpegFrameGrabber;
+import org.bytedeco.javacpp.opencv_core;
+import org.bytedeco.javacv.*;
 import org.bytedeco.javacv.Frame;
-import org.bytedeco.javacv.FrameGrabber;
-import org.bytedeco.javacv.Java2DFrameConverter;
+import org.opencv.core.Mat;
 import org.tensorflow.SavedModelBundle;
 import org.tensorflow.Tensor;
 import org.tensorflow.framework.MetaGraphDef;
 import org.tensorflow.framework.SignatureDef;
 import org.tensorflow.framework.TensorInfo;
 import org.tensorflow.types.UInt8;
+import static  org.bytedeco.javacpp.opencv_core.*;
+import static  org.bytedeco.javacpp.opencv_imgproc.putText;
+import static  org.bytedeco.javacpp.opencv_imgproc.rectangle;
 
 /**
  * Java inference for the Object Detection API at:
  * https://github.com/tensorflow/models/blob/master/research/object_detection/
  */
 public class DetectObjects {
-    public static void main(String[] args) throws Exception {
-      /*  if (args.length < 3) {
-            printUsage(System.err);
-            System.exit(1);
-        }*/
 
-        final String label = "labels/mscoco_label_map.pbtxt";
-        final String[] labels = loadLabels(label);
+    private final Stack<Frame> stack = new Stack();
+
+    static List<Tensor<?>> outputs = null;
+
+    public void detectObjects(String models, String[] labels) throws Exception {
 
 
-        final String models = "models/ssd_inception_v2_coco_2017_11_17/saved_model";
+        try (SavedModelBundle model = SavedModelBundle.load(models, "serve")) {
+            printSignature(model);
+            //for (int arg = 2; arg < args.length; arg++) {
+            // final String filename = args[arg];
 
-        final String imageName = "images/test.jpg";
-        final String fileName2 = "images/videoSample2.mp4";
-        List<BufferedImage> frameList1 = new ArrayList<>();
-        frameList1 = makeFrameStack(fileName2);
+            //Stack<Frame> frameStack = new Stack<>();
 
-        BufferedImage orginalImage = ImageIO.read(new File("images/test.jpg"));
+
+            //         for (BufferedImage img3:frameList1) {
+
+
+            try (Tensor<UInt8> input = makeImageTensor(imageName)) {
+                outputs =
+                        model
+                                .session()
+                                .runner()
+                                .feed("image_tensor", input)
+                                .fetch("detection_scores")
+                                .fetch("detection_classes")
+                                .fetch("detection_boxes")
+                                .run();
+            }
+
+            try (Tensor<Float> scoresT = outputs.get(0).expect(Float.class);
+                 Tensor<Float> classesT = outputs.get(1).expect(Float.class);
+                 Tensor<Float> boxesT = outputs.get(2).expect(Float.class)) {
+                // All these tensors have:
+                // - 1 as the first dimension
+                // - maxObjects as the second dimension
+                // While boxesT will have 4 as the third dimension (2 sets of (x, y) coordinates).
+                // This can be verified by looking at scoresT.shape() etc.
+                int maxObjects = (int) scoresT.shape()[1];
+                float[] scores = scoresT.copyTo(new float[1][maxObjects])[0];
+                float[] classes = classesT.copyTo(new float[1][maxObjects])[0];
+                float[][] boxes = boxesT.copyTo(new float[1][maxObjects][4])[0];
+
+                // Print all objects whose score is at least 0.5.
+                System.out.printf("* %s\n", imageName);
+                boolean foundSomething = false;
+                int noOfDetections=0;
+                for (int i = 0; i < scores.length; ++i) {
+                    if (scores[i] < 0.5) {
+                        continue;
+                    }
+                    foundSomething = true;
+                    noOfDetections++;
+                    System.out.printf("\tFound %-20s (score: %.4f)\n", labels[(int) classes[i]], scores[i]);
+                }
+              //  drawBoundingBox(imageName);
+
+
+                System.out.println("number of Detected objects:"+noOfDetections);
+                if (!foundSomething) {
+                    System.out.println("No objects detected with a high enough score.");
+                }
+            }
+        }
+    }
+
+    public void drawBoundingBox(Frame frame, opencv_core.Mat matFrame) throws IOException {
+
+        if (invalidData(frame,matFrame)) return;
+
+        ArrayList<Tensor<?>> detectedObjects = new ArrayList<>(outputs);
+
+        Tensor<Float> scoresT1 = detectedObjects.get(0).expect(Float.class);
+        //Tensor<Float> classesT1 = outputs.get(1).expect(Float.class);
+        Tensor<Float> boxesT1 = detectedObjects.get(2).expect(Float.class);
+
+
+        int maxObjects1 = (int) scoresT1.shape()[1];
+        float[] scores1 = scoresT1.copyTo(new float[1][maxObjects1])[0];
+        //float[] classes1 = classesT.copyTo(new float[1][maxObjects])[0];
+        float[][] boxes1 = boxesT1.copyTo(new float[1][maxObjects1][4])[0];
+
+
+
+
+        Java2DFrameConverter conv = new Java2DFrameConverter();
+       // BufferedImage orginalImage = ImageIO.read(new File(name));
+        BufferedImage orginalImage = conv.convert(frame);
+
 
         BufferedImage bi = new BufferedImage(orginalImage.getWidth(),orginalImage.getHeight(),BufferedImage.TYPE_INT_RGB);
 
@@ -62,103 +137,36 @@ public class DetectObjects {
         int w = bi.getWidth();
         int h = bi.getHeight();
         int bufferSize = w*h*3;
+           for (int bb = 0; bb < 5; bb++) {
+                System.out.println("-----------------------------------");
+                int ymin = Math.round(boxes1[bb][0] * h);
+                int xmin = Math.round(boxes1[bb][1] * w);
+                int ymax = Math.round(boxes1[bb][2] * h);
+                int xmax = Math.round(boxes1[bb][3] * w);
 
 
-        try (SavedModelBundle model = SavedModelBundle.load(models, "serve")) {
-            printSignature(model);
-            //for (int arg = 2; arg < args.length; arg++) {
-            // final String filename = args[arg];
-            List<Tensor<?>> outputs = null;
-            //Stack<Frame> frameStack = new Stack<>();
 
 
-   //         for (BufferedImage img3:frameList1) {
-
-
-                try (Tensor<UInt8> input = makeImageTensor(imageName)) {
-                    outputs =
-                            model
-                                    .session()
-                                    .runner()
-                                    .feed("image_tensor", input)
-                                    .fetch("detection_scores")
-                                    .fetch("detection_classes")
-                                    .fetch("detection_boxes")
-                                    .run();
-                }
-                try (Tensor<Float> scoresT = outputs.get(0).expect(Float.class);
-                     Tensor<Float> classesT = outputs.get(1).expect(Float.class);
-                     Tensor<Float> boxesT = outputs.get(2).expect(Float.class)) {
-                    // All these tensors have:
-                    // - 1 as the first dimension
-                    // - maxObjects as the second dimension
-                    // While boxesT will have 4 as the third dimension (2 sets of (x, y) coordinates).
-                    // This can be verified by looking at scoresT.shape() etc.
-                    int maxObjects = (int) scoresT.shape()[1];
-                    float[] scores = scoresT.copyTo(new float[1][maxObjects])[0];
-                    float[] classes = classesT.copyTo(new float[1][maxObjects])[0];
-                    float[][] boxes = boxesT.copyTo(new float[1][maxObjects][4])[0];
-
-                    // Print all objects whose score is at least 0.5.
-                    System.out.printf("* %s\n", imageName);
-                    boolean foundSomething = false;
-                    int noOfDetections=0;
-                    for (int i = 0; i < scores.length; ++i) {
-                        if (scores[i] < 0.5) {
-                            continue;
-                        }
-                        foundSomething = true;
-                        noOfDetections++;
-                        System.out.printf("\tFound %-20s (score: %.4f)\n", labels[(int) classes[i]], scores[i]);
-                    }
-
-                    for(int bb=0;bb<5;bb++){
-                        System.out.println("-----------------------------------");
-                        int ymin = Math.round(boxes[bb][0] * h);
-                        int xmin = Math.round(boxes[bb][1] * w);
-                        int ymax = Math.round(boxes[bb][2] * h);
-                        int xmax = Math.round(boxes[bb][3] * w);
-
-                        System.out.println("X1 " + xmin + " Y1 " + ymin + " X2 " + xmax + " Y2 " + ymax);
-                       // System.out.println("Score " + detection_scores[0][i]);
-                     //   System.out.println("Predicted " + detection_classes[0][i]);
+                System.out.println("X1 " + xmin + " Y1 " + ymin + " X2 " + xmax + " Y2 " + ymax);
+                // System.out.println("Score " + detection_scores[0][i]);
+                //   System.out.println("Predicted " + detection_classes[0][i]);
 //
-                        g.setColor(Color.RED);
-                        g.drawRect(xmin, ymin, xmax - xmin, ymax - ymin);
-                       // g.drawString(labels[Math.round(detection_classes[0][i])], xmin, ymin);
-                    }
-                    ImageIO.write(bi,"PNG",new File("images/result" + System.currentTimeMillis() + ".png"));
-                    System.out.println("number of Detected objects:"+noOfDetections);
-                    if (!foundSomething) {
-                        System.out.println("No objects detected with a high enough score.");
-                    }
-                }
-            }
+
+                g.setColor(Color.RED);
+                g.drawRect(xmin, ymin, xmax - xmin, ymax - ymin);
+               // g.drawString(labels[Math.round(detection_classes[0][i])], xmin, ymin);
+
         }
+        //ImageIO.write(bi,"PNG",new File("images/result" + System.currentTimeMillis() + ".png"));
 
-    //}
-    //}
 
-    private static List<BufferedImage> makeFrameStack(String filename2) throws FrameGrabber.Exception, IOException {
 
-        File videoFile = new File(filename2);
 
-        List<BufferedImage> frameList = new ArrayList<>();
-        FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(filename2);
-        grabber.start();
-        Frame frame;
-        Java2DFrameConverter cnv = new Java2DFrameConverter();
-
-        for (int ii=1;ii<grabber.getLengthInFrames();ii++){
-            frame = grabber.grab();
-            BufferedImage img = cnv.convert(frame);
-           // ImageIO.write(img, "png", new File("images/video-frame-" + System.currentTimeMillis() + ".png"));
-            frameList.add(img);
-        }
-        grabber.stop();
-
-        return frameList;
     }
+    private boolean invalidData(Frame frame, opencv_core.Mat matFrame){
+        return outputs == null || matFrame==null || frame == null;
+    }
+
 
 
 
@@ -188,7 +196,7 @@ public class DetectObjects {
         System.out.println("-----------------------------------------------");
     }
 
-    private static String[] loadLabels(String filename) throws Exception {
+    public static String[] loadLabels(String filename) throws Exception {
         String text = new String(Files.readAllBytes(Paths.get(filename)), StandardCharsets.UTF_8);
         StringIntLabelMap.Builder builder = StringIntLabelMap.newBuilder();
         TextFormat.merge(text, builder);
@@ -234,6 +242,10 @@ public class DetectObjects {
         return Tensor.create(UInt8.class, shape, ByteBuffer.wrap(data));
     }
 
+
+    public void push(Frame matFrame){
+        stack.push(matFrame);
+    }
     private static void printUsage(PrintStream s) {
         s.println("USAGE: <model> <label_map> <image> [<image>] [<image>]");
         s.println("");
