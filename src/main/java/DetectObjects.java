@@ -22,7 +22,7 @@ import javax.imageio.ImageIO;
 import org.bytedeco.javacpp.opencv_core;
 import org.bytedeco.javacv.*;
 import org.bytedeco.javacv.Frame;
-import org.opencv.core.Mat;
+
 import org.tensorflow.SavedModelBundle;
 import org.tensorflow.Tensor;
 import org.tensorflow.framework.MetaGraphDef;
@@ -40,13 +40,20 @@ import static  org.bytedeco.javacpp.opencv_imgproc.rectangle;
 public class DetectObjects {
 
     private final Stack<Frame> stack = new Stack();
+    static SavedModelBundle model ;
 
     static List<Tensor<?>> outputs = null;
 
-    public void detectObjects(String models, String[] labels) throws Exception {
+
+    public static void modelbuild(String models){
+        model = SavedModelBundle.load(models, "serve");
+    }
 
 
-        try (SavedModelBundle model = SavedModelBundle.load(models, "serve")) {
+    public void detectObjects(String[] labels) throws Exception {
+
+
+
             printSignature(model);
             //for (int arg = 2; arg < args.length; arg++) {
             // final String filename = args[arg];
@@ -57,7 +64,7 @@ public class DetectObjects {
             //         for (BufferedImage img3:frameList1) {
 
 
-            try (Tensor<UInt8> input = makeImageTensor(imageName)) {
+            try (Tensor<UInt8> input = makeImageTensor(stack.pop())) {
                 outputs =
                         model
                                 .session()
@@ -83,7 +90,7 @@ public class DetectObjects {
                 float[][] boxes = boxesT.copyTo(new float[1][maxObjects][4])[0];
 
                 // Print all objects whose score is at least 0.5.
-                System.out.printf("* %s\n", imageName);
+                System.out.printf("* %s\n", "frames");
                 boolean foundSomething = false;
                 int noOfDetections=0;
                 for (int i = 0; i < scores.length; ++i) {
@@ -103,13 +110,23 @@ public class DetectObjects {
                 }
             }
         }
-    }
+
 
     public void drawBoundingBox(Frame frame, opencv_core.Mat matFrame) throws IOException {
 
         if (invalidData(frame,matFrame)) return;
 
-        ArrayList<Tensor<?>> detectedObjects = new ArrayList<>(outputs);
+
+
+
+        List<Tensor<?>> detectedObjects = new ArrayList<>();
+        detectedObjects =  model.session()
+                .runner()
+                .feed("image_tensor", makeImageTensor(frame))
+                .fetch("detection_scores")
+                .fetch("detection_classes")
+                .fetch("detection_boxes")
+                .run();
 
         Tensor<Float> scoresT1 = detectedObjects.get(0).expect(Float.class);
         //Tensor<Float> classesT1 = outputs.get(1).expect(Float.class);
@@ -117,7 +134,7 @@ public class DetectObjects {
 
 
         int maxObjects1 = (int) scoresT1.shape()[1];
-        float[] scores1 = scoresT1.copyTo(new float[1][maxObjects1])[0];
+//        float[] scores1 = scoresT1.copyTo(new float[1][maxObjects1])[0];
         //float[] classes1 = classesT.copyTo(new float[1][maxObjects])[0];
         float[][] boxes1 = boxesT1.copyTo(new float[1][maxObjects1][4])[0];
 
@@ -157,7 +174,7 @@ public class DetectObjects {
                // g.drawString(labels[Math.round(detection_classes[0][i])], xmin, ymin);
 
         }
-        //ImageIO.write(bi,"PNG",new File("images/result" + System.currentTimeMillis() + ".png"));
+        ImageIO.write(bi,"PNG",new File("images/result" + System.currentTimeMillis() + ".png"));
 
 
 
@@ -222,10 +239,10 @@ public class DetectObjects {
         }
     }
 
-    private static Tensor<UInt8> makeImageTensor(String filename) throws IOException {
+    private static Tensor<UInt8> makeImageTensor(Frame filename) throws IOException {
         Java2DFrameConverter conv = new Java2DFrameConverter();
-        //BufferedImage img = conv.convert(frame1);
-        BufferedImage img = ImageIO.read(new File(filename));
+        BufferedImage img = conv.convert(filename);
+      //  BufferedImage img = ImageIO.read(new File(filename));
        // BufferedImage img = filename;
         if (img.getType() != BufferedImage.TYPE_3BYTE_BGR) {
             throw new IOException(

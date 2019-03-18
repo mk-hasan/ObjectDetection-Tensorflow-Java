@@ -10,7 +10,7 @@
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="ObjectDetection-Tensorflow-Java" target="1.7" />
+      <module name="ObjectDetection-Tensorflow-Java" target="8" />
     </bytecodeTargetLevel>
   </component>
 </project>

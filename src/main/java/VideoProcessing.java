@@ -3,20 +3,23 @@ import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
 import org.bytedeco.javacv.OpenCVFrameConverter;
-import org.opencv.core.Mat;
+
+import java.io.File;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.bytedeco.javacpp.opencv_highgui.*;
+
 
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
-import static org.bytedeco.javacpp.opencv_highgui.*;
-
 
 public class VideoProcessing {
 
 
-    private static Logger log = Logger.getAnonymousLogger();
+    //private static Logger log = Logger.getAnonymousLogger();
 
     private static final String AUTONOMOUS_DRIVING = "Autonomous Driving(TU Berlin)";
     private String windowName;
@@ -29,24 +32,26 @@ public class VideoProcessing {
     DetectObjects detobj = new DetectObjects();
 
     public void startRealTimeVideoDetection(String model, String[] labels,String videoFileName) throws java.lang.Exception {
-        log.info("Start detecting video " + videoFileName);
+        //log.info("Start detecting video " + videoFileName);
 
         int id = atomicInteger.incrementAndGet();
         windowName = AUTONOMOUS_DRIVING + id;
-        log.info(windowName);
+      //  log.info(windowName);
 
 
+
+        detobj.modelbuild(model);
         startYoloThread(model,labels);
         runVideoMainThread(videoFileName, convert);
     }
 
-    private void runVideoMainThread(String videoFileName, OpenCVFrameConverter.ToMat convert) throws IOException {
-        File videoFile = new File(videoFileName);
+    private void runVideoMainThread(String videoFileName, OpenCVFrameConverter.ToMat convert) throws IOException, FrameGrabber.Exception {
+      //  File videoFile = new File(videoFileName);
         FFmpegFrameGrabber grabber = initFrameGrabber(videoFileName);
         while (!stop) {
             Frame frame = grabber.grab();
             if (frame == null) {
-                log.info("Stopping");
+               // log.info("Stopping");
                 stop();
                 break;
             }
@@ -83,14 +88,14 @@ public class VideoProcessing {
         Thread thread = new Thread(() -> {
             while (!stop) {
                 try {
-                    detobj.detectObjects(model,labels);
+                    detobj.detectObjects(labels);
                 } catch (Exception e) {
                     //ignoring a thread failure
                     //it may fail because the frame may be long gone when thread get chance to execute
                 }
             }
             detobj = null;
-            log.info("MobileNet Thread Exit");
+           // log.info("MobileNet Thread Exit");
         });
         thread.start();
     }
