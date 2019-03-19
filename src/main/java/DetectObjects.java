@@ -23,13 +23,18 @@ import org.bytedeco.javacpp.opencv_core;
 import org.bytedeco.javacv.*;
 import org.bytedeco.javacv.Frame;
 
+import org.imgscalr.Scalr;
 import org.tensorflow.SavedModelBundle;
+import org.tensorflow.Session;
 import org.tensorflow.Tensor;
 import org.tensorflow.framework.MetaGraphDef;
 import org.tensorflow.framework.SignatureDef;
 import org.tensorflow.framework.TensorInfo;
 import org.tensorflow.types.UInt8;
 import static  org.bytedeco.javacpp.opencv_core.*;
+import static org.bytedeco.javacpp.opencv_core.Scalar.*;
+import static org.bytedeco.javacpp.opencv_highgui.cvInitSystem;
+import static org.bytedeco.javacpp.opencv_highgui.imshow;
 import static  org.bytedeco.javacpp.opencv_imgproc.putText;
 import static  org.bytedeco.javacpp.opencv_imgproc.rectangle;
 
@@ -40,21 +45,25 @@ import static  org.bytedeco.javacpp.opencv_imgproc.rectangle;
 public class DetectObjects {
 
     private final Stack<Frame> stack = new Stack();
-    static SavedModelBundle model ;
+  //  static SavedModelBundle model ;
 
     static List<Tensor<?>> outputs = null;
 
 
-    public static void modelbuild(String models){
-        model = SavedModelBundle.load(models, "serve");
-    }
+    int maxObjects;
+    float[] scores;
+    float[] classes;
+    float[][] boxes;
+
+    //model = SavedModelBundle.load(models, "serve");
 
 
-    public void detectObjects(String[] labels) throws Exception {
+    public void detectObjects(String[] labels, Session model) throws Exception {
 
 
+        long start = System.currentTimeMillis();
 
-            printSignature(model);
+            //printSignature(model);
             //for (int arg = 2; arg < args.length; arg++) {
             // final String filename = args[arg];
 
@@ -66,9 +75,7 @@ public class DetectObjects {
 
             try (Tensor<UInt8> input = makeImageTensor(stack.pop())) {
                 outputs =
-                        model
-                                .session()
-                                .runner()
+                        model.runner()
                                 .feed("image_tensor", input)
                                 .fetch("detection_scores")
                                 .fetch("detection_classes")
@@ -84,10 +91,10 @@ public class DetectObjects {
                 // - maxObjects as the second dimension
                 // While boxesT will have 4 as the third dimension (2 sets of (x, y) coordinates).
                 // This can be verified by looking at scoresT.shape() etc.
-                int maxObjects = (int) scoresT.shape()[1];
-                float[] scores = scoresT.copyTo(new float[1][maxObjects])[0];
-                float[] classes = classesT.copyTo(new float[1][maxObjects])[0];
-                float[][] boxes = boxesT.copyTo(new float[1][maxObjects][4])[0];
+                maxObjects = (int) scoresT.shape()[1];
+                scores = scoresT.copyTo(new float[1][maxObjects])[0];
+                classes = classesT.copyTo(new float[1][maxObjects])[0];
+                boxes = boxesT.copyTo(new float[1][maxObjects][4])[0];
 
                 // Print all objects whose score is at least 0.5.
                 System.out.printf("* %s\n", "frames");
@@ -104,7 +111,8 @@ public class DetectObjects {
               //  drawBoundingBox(imageName);
 
 
-                System.out.println("number of Detected objects:"+noOfDetections);
+               // System.out.println("number of Detected objects:"+noOfDetections);
+                System.out.println("number of Detected objects:"+noOfDetections+"and Prediction time " + (System.currentTimeMillis() - start) / 1000d);
                 if (!foundSomething) {
                     System.out.println("No objects detected with a high enough score.");
                 }
@@ -112,15 +120,15 @@ public class DetectObjects {
         }
 
 
-    public void drawBoundingBox(Frame frame, opencv_core.Mat matFrame) throws IOException {
+    public void drawBoundingBox(Frame frame, opencv_core.Mat matFrame,String [] labels, Session model) throws IOException {
 
         if (invalidData(frame,matFrame)) return;
 
 
 
 
-        List<Tensor<?>> detectedObjects = new ArrayList<>();
-        detectedObjects =  model.session()
+       /* List<Tensor<?>> detectedObjects = new ArrayList<>();
+        detectedObjects =  model
                 .runner()
                 .feed("image_tensor", makeImageTensor(frame))
                 .fetch("detection_scores")
@@ -129,17 +137,17 @@ public class DetectObjects {
                 .run();
 
         Tensor<Float> scoresT1 = detectedObjects.get(0).expect(Float.class);
-        //Tensor<Float> classesT1 = outputs.get(1).expect(Float.class);
+        Tensor<Float> classesT1 = detectedObjects.get(1).expect(Float.class);
         Tensor<Float> boxesT1 = detectedObjects.get(2).expect(Float.class);
 
 
         int maxObjects1 = (int) scoresT1.shape()[1];
 //        float[] scores1 = scoresT1.copyTo(new float[1][maxObjects1])[0];
-        //float[] classes1 = classesT.copyTo(new float[1][maxObjects])[0];
+        float[] classes1 = classesT1.copyTo(new float[1][maxObjects1])[0];
         float[][] boxes1 = boxesT1.copyTo(new float[1][maxObjects1][4])[0];
 
 
-
+*/
 
         Java2DFrameConverter conv = new Java2DFrameConverter();
        // BufferedImage orginalImage = ImageIO.read(new File(name));
@@ -148,35 +156,45 @@ public class DetectObjects {
 
         BufferedImage bi = new BufferedImage(orginalImage.getWidth(),orginalImage.getHeight(),BufferedImage.TYPE_INT_RGB);
 
-        Graphics2D g = (Graphics2D)bi.getGraphics();
-        g.drawImage(orginalImage,0,0,null);
-        System.out.println(bi.getType());
+        //BufferedImage bi = Scalr.resize(bi1,400);
+        //Graphics2D g = (Graphics2D)bi.getGraphics();
+       // g.drawImage(orginalImage,0,0,null);
+       // System.out.println(bi.getType());
         int w = bi.getWidth();
         int h = bi.getHeight();
+     /*   int w =227;
+        int h=227;*/
         int bufferSize = w*h*3;
            for (int bb = 0; bb < 5; bb++) {
-                System.out.println("-----------------------------------");
-                int ymin = Math.round(boxes1[bb][0] * h);
-                int xmin = Math.round(boxes1[bb][1] * w);
-                int ymax = Math.round(boxes1[bb][2] * h);
-                int xmax = Math.round(boxes1[bb][3] * w);
+                //System.out.println("-----------------------------------");
+                int ymin = Math.round(boxes[bb][0] * h);
+                int xmin = Math.round(boxes[bb][1] * w);
+                int ymax = Math.round(boxes[bb][2] * h);
+                int xmax = Math.round(boxes[bb][3] * w);
 
 
 
 
-                System.out.println("X1 " + xmin + " Y1 " + ymin + " X2 " + xmax + " Y2 " + ymax);
+                //System.out.println("X1 " + xmin + " Y1 " + ymin + " X2 " + xmax + " Y2 " + ymax);
                 // System.out.println("Score " + detection_scores[0][i]);
                 //   System.out.println("Predicted " + detection_classes[0][i]);
 //
 
-                g.setColor(Color.RED);
-                g.drawRect(xmin, ymin, xmax - xmin, ymax - ymin);
+                //g.setColor(Color.RED);
+                //g.drawRect(xmin, ymin, xmax - xmin, ymax - ymin);
                // g.drawString(labels[Math.round(detection_classes[0][i])], xmin, ymin);
 
+               rectangle(matFrame,new opencv_core.Point(xmin,ymin), new opencv_core.Point(xmax,ymax), RED);
+
+               putText(matFrame, labels[(int) classes[bb]],new opencv_core.Point(xmin+2,ymin-2),FONT_HERSHEY_DUPLEX,1, GREEN);
+
+
+
         }
-        ImageIO.write(bi,"PNG",new File("images/result" + System.currentTimeMillis() + ".png"));
+        //ImageIO.write(bi,"PNG",new File("images/result" + System.currentTimeMillis() + ".png"));
 
 
+       // imshow("Detected Window",matFrame);
 
 
     }
@@ -244,18 +262,27 @@ public class DetectObjects {
         BufferedImage img = conv.convert(filename);
       //  BufferedImage img = ImageIO.read(new File(filename));
        // BufferedImage img = filename;
+       // System.out.println("image type"+img.getType());
+
+        //BufferedImage img = Scalr.resize(img1,400);
+
         if (img.getType() != BufferedImage.TYPE_3BYTE_BGR) {
             throw new IOException(
                     String.format(
                             "Expected 3-byte BGR encoding in BufferedImage, found %d (file: %s). This code could be made more robust",
                             img.getType(), "man.png"));
+
         }
         byte[] data = ((DataBufferByte) img.getData().getDataBuffer()).getData();
         // ImageIO.read seems to produce BGR-encoded images, but the model expects RGB.
         bgr2rgb(data);
         final long BATCH_SIZE = 1;
         final long CHANNELS = 3;
+        /*int width = 227;
+        int hight = 227;*/
         long[] shape = new long[] {BATCH_SIZE, img.getHeight(), img.getWidth(), CHANNELS};
+        System.out.println(img.getHeight());
+        //long[] shape = new long[] {BATCH_SIZE,hight, width, CHANNELS};
         return Tensor.create(UInt8.class, shape, ByteBuffer.wrap(data));
     }
 
