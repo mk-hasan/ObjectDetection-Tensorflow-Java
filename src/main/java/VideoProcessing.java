@@ -3,6 +3,8 @@ import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
 import org.bytedeco.javacv.OpenCVFrameConverter;
+import org.tensorflow.SavedModelBundle;
+import org.tensorflow.Session;
 
 import java.io.File;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,6 +26,7 @@ public class VideoProcessing {
     private static final String AUTONOMOUS_DRIVING = "Autonomous Driving(TU Berlin)";
     private String windowName;
     private volatile boolean stop = false;
+    static SavedModelBundle model ;
 
    // private final OpenCVFrameConverter.ToMat conv = new OpenCVFrameConverter.ToMat();
     private final OpenCVFrameConverter.ToMat convert = new OpenCVFrameConverter.ToMat();
@@ -31,7 +34,7 @@ public class VideoProcessing {
 
     DetectObjects detobj = new DetectObjects();
 
-    public void startRealTimeVideoDetection(String model, String[] labels,String videoFileName) throws java.lang.Exception {
+    public void startRealTimeVideoDetection(String models, String[] labels,String videoFileName) throws java.lang.Exception {
         //log.info("Start detecting video " + videoFileName);
 
         int id = atomicInteger.incrementAndGet();
@@ -40,12 +43,19 @@ public class VideoProcessing {
 
 
 
-        detobj.modelbuild(model);
-        startYoloThread(model,labels);
-        runVideoMainThread(videoFileName, convert);
+
+        model = SavedModelBundle.load(models, "serve");
+
+        Session sees = model.session();
+         //sees.runner();
+
+
+        startYoloThread(sees,labels);
+        runVideoMainThread(videoFileName, convert,labels,sees);
+        sees.close();
     }
 
-    private void runVideoMainThread(String videoFileName, OpenCVFrameConverter.ToMat convert) throws IOException, FrameGrabber.Exception {
+    private void runVideoMainThread(String videoFileName, OpenCVFrameConverter.ToMat convert,String [] labels,Session sees) throws IOException, FrameGrabber.Exception {
       //  File videoFile = new File(videoFileName);
         FFmpegFrameGrabber grabber = initFrameGrabber(videoFileName);
         while (!stop) {
@@ -64,7 +74,7 @@ public class VideoProcessing {
 
 
 
-            detobj.drawBoundingBox(frame, mat);
+            detobj.drawBoundingBox(frame, mat,labels,sees);
             //imshow(windowName,mat);
 
             imshow(windowName,mat);
@@ -83,12 +93,12 @@ public class VideoProcessing {
         return grabber;
     }
 
-    private void startYoloThread(final String model, final String[] labels) {
+    private void startYoloThread(Session sess , final String[] labels) {
 
         Thread thread = new Thread(() -> {
             while (!stop) {
                 try {
-                    detobj.detectObjects(labels);
+                    detobj.detectObjects(labels,sess);
                 } catch (Exception e) {
                     //ignoring a thread failure
                     //it may fail because the frame may be long gone when thread get chance to execute
