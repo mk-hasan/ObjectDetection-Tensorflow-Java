@@ -6,16 +6,15 @@ import org.bytedeco.javacv.OpenCVFrameConverter;
 import org.tensorflow.SavedModelBundle;
 import org.tensorflow.Session;
 
-import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.bytedeco.javacpp.opencv_highgui.*;
 
-
-import java.io.File;
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Logger;
+/*
+Name: Md Kamrul Hasan
+Email: hasan.alive@gmail.com
+*/
 
 
 public class VideoProcessing {
@@ -23,7 +22,7 @@ public class VideoProcessing {
 
     //private static Logger log = Logger.getAnonymousLogger();
 
-    private static final String AUTONOMOUS_DRIVING = "Autonomous Driving(TU Berlin)";
+    private static final String AUTONOMOUS_DRIVING = "Object Detection(TU Berlin)";
     private String windowName;
     private volatile boolean stop = false;
     static SavedModelBundle model ;
@@ -34,7 +33,7 @@ public class VideoProcessing {
 
     DetectObjects detobj = new DetectObjects();
 
-    public void startRealTimeVideoDetection(String models, String[] labels,String videoFileName) throws java.lang.Exception {
+    public void startRealTimeVideoDetection(Session models, String[] labels,String videoFileName) throws java.lang.Exception {
         //log.info("Start detecting video " + videoFileName);
 
         int id = atomicInteger.incrementAndGet();
@@ -44,9 +43,10 @@ public class VideoProcessing {
 
 
 
-        model = SavedModelBundle.load(models, "serve");
+        //model = SavedModelBundle.load(models, "serve");
 
-        Session sees = model.session();
+        //Session sees = model.session();
+        Session sees = models;
          //sees.runner();
 
 

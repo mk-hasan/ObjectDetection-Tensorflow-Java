@@ -1,13 +1,15 @@
-import org.bytedeco.javacv.FFmpegFrameGrabber;
-import org.bytedeco.javacv.Frame;
-import org.bytedeco.javacv.FrameGrabber;
-import org.bytedeco.javacv.Java2DFrameConverter;
-
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
+import org.tensorflow.Graph;
+import org.tensorflow.Session;
+
+/*
+Name: Md Kamrul Hasan
+Email: hasan.alive@gmail.com
+*/
 
 public class MobileNetRun {
 
@@ -21,7 +23,7 @@ public class MobileNetRun {
         final String[] labels = detectObj.loadLabels(label);
 
 
-        final String models = "models/ssd_inception_v2_coco_2017_11_17/saved_model";
+        //final String models = "/home/hasan/Downloads/frozen_darknet_yolov3_model.pb";
 
         final String imageName = "images/test.jpg";
         final String fileName2 = "images/videoSample2.mp4";
@@ -30,6 +32,11 @@ public class MobileNetRun {
         //frameList1 = makeFrameStack(fileName2);
 
 
+        Session models;
+        try (Graph graph = new Graph()) {
+            graph.importGraphDef(FileUtils.readFileToByteArray(new File("/home/hasan/Downloads/frozen_darknet_yolov3_model.pb")));
+            models = new Session(graph);
+        }
 
         VideoProcessing vp = new VideoProcessing();
         vp.startRealTimeVideoDetection(models,labels,fileName2);

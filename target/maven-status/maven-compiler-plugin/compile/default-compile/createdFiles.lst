@@ -1,5 +1,5 @@
-object_detection/protos/StringIntLabelMapOuterClass.class
 DetectObjects.class
+object_detection/protos/StringIntLabelMapOuterClass.class
 object_detection/protos/StringIntLabelMapOuterClass$StringIntLabelMap$Builder.class
 VideoProcessing.class
 object_detection/protos/StringIntLabelMapOuterClass$1.class

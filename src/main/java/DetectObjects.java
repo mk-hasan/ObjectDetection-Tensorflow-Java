@@ -1,29 +1,7 @@
-import static object_detection.protos.StringIntLabelMapOuterClass.StringIntLabelMap;
-import static object_detection.protos.StringIntLabelMapOuterClass.StringIntLabelMapItem;
-
 import com.google.protobuf.TextFormat;
-
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferByte;
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Stack;
-import javax.imageio.ImageIO;
-
 import org.bytedeco.javacpp.opencv_core;
-import org.bytedeco.javacv.*;
 import org.bytedeco.javacv.Frame;
-
-import org.imgscalr.Scalr;
+import org.bytedeco.javacv.Java2DFrameConverter;
 import org.tensorflow.SavedModelBundle;
 import org.tensorflow.Session;
 import org.tensorflow.Tensor;
@@ -31,17 +9,38 @@ import org.tensorflow.framework.MetaGraphDef;
 import org.tensorflow.framework.SignatureDef;
 import org.tensorflow.framework.TensorInfo;
 import org.tensorflow.types.UInt8;
-import static  org.bytedeco.javacpp.opencv_core.*;
-import static org.bytedeco.javacpp.opencv_core.Scalar.*;
-import static org.bytedeco.javacpp.opencv_highgui.cvInitSystem;
-import static org.bytedeco.javacpp.opencv_highgui.imshow;
-import static  org.bytedeco.javacpp.opencv_imgproc.putText;
-import static  org.bytedeco.javacpp.opencv_imgproc.rectangle;
+
+
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.Map;
+import java.util.Stack;
+
+import static object_detection.protos.StringIntLabelMapOuterClass.StringIntLabelMap;
+import static object_detection.protos.StringIntLabelMapOuterClass.StringIntLabelMapItem;
+import static org.bytedeco.javacpp.opencv_core.FONT_HERSHEY_DUPLEX;
+import static org.bytedeco.javacpp.opencv_core.Scalar.GREEN;
+import static org.bytedeco.javacpp.opencv_core.Scalar.RED;
+import static org.bytedeco.javacpp.opencv_imgproc.putText;
+import static org.bytedeco.javacpp.opencv_imgproc.rectangle;
 
 /**
  * Java inference for the Object Detection API at:
  * https://github.com/tensorflow/models/blob/master/research/object_detection/
  */
+
+
+/*
+Name: Md Kamrul Hasan
+Email: hasan.alive@gmail.com
+*/
 public class DetectObjects {
 
     private final Stack<Frame> stack = new Stack();
@@ -112,17 +111,17 @@ public class DetectObjects {
 
 
                // System.out.println("number of Detected objects:"+noOfDetections);
-                System.out.println("number of Detected objects:"+noOfDetections+"and Prediction time " + (System.currentTimeMillis() - start) / 1000d);
+                System.out.println("number of Detected objects:"+noOfDetections+" and Prediction time " + (System.currentTimeMillis() - start) + ".ms");
                 if (!foundSomething) {
                     System.out.println("No objects detected with a high enough score.");
                 }
             }
         }
 
-
+    synchronized
     public void drawBoundingBox(Frame frame, opencv_core.Mat matFrame,String [] labels, Session model) throws IOException {
-
-        if (invalidData(frame,matFrame)) return;
+        synchronized (frame) {
+           if (invalidData(frame, matFrame)) return;
 
 
 
@@ -149,30 +148,34 @@ public class DetectObjects {
 
 */
 
-        Java2DFrameConverter conv = new Java2DFrameConverter();
-       // BufferedImage orginalImage = ImageIO.read(new File(name));
-        BufferedImage orginalImage = conv.convert(frame);
+            Java2DFrameConverter conv = new Java2DFrameConverter();
+            // BufferedImage orginalImage = ImageIO.read(new File(name));
+            BufferedImage orginalImage = null;
+            try {
+                orginalImage = conv.convert(frame);
+            } catch (Exception e){
+                System.out.println(e.toString());
+            }
 
+            if (orginalImage == null) return;
 
-        BufferedImage bi = new BufferedImage(orginalImage.getWidth(),orginalImage.getHeight(),BufferedImage.TYPE_INT_RGB);
+            BufferedImage bi = new BufferedImage(orginalImage.getWidth(), orginalImage.getHeight(), BufferedImage.TYPE_3BYTE_BGR);
 
-        //BufferedImage bi = Scalr.resize(bi1,400);
-        //Graphics2D g = (Graphics2D)bi.getGraphics();
-       // g.drawImage(orginalImage,0,0,null);
-       // System.out.println(bi.getType());
-        int w = bi.getWidth();
-        int h = bi.getHeight();
+            //BufferedImage bi = Scalr.resize(bi1,400);
+            //Graphics2D g = (Graphics2D)bi.getGraphics();
+            // g.drawImage(orginalImage,0,0,null);
+            // System.out.println(bi.getType());
+            int w = bi.getWidth();
+            int h = bi.getHeight();
      /*   int w =227;
         int h=227;*/
-        int bufferSize = w*h*3;
-           for (int bb = 0; bb < 5; bb++) {
+            int bufferSize = w * h * 3;
+            for (int bb = 0; bb < 5; bb++) {
                 //System.out.println("-----------------------------------");
                 int ymin = Math.round(boxes[bb][0] * h);
                 int xmin = Math.round(boxes[bb][1] * w);
                 int ymax = Math.round(boxes[bb][2] * h);
                 int xmax = Math.round(boxes[bb][3] * w);
-
-
 
 
                 //System.out.println("X1 " + xmin + " Y1 " + ymin + " X2 " + xmax + " Y2 " + ymax);
@@ -182,21 +185,20 @@ public class DetectObjects {
 
                 //g.setColor(Color.RED);
                 //g.drawRect(xmin, ymin, xmax - xmin, ymax - ymin);
-               // g.drawString(labels[Math.round(detection_classes[0][i])], xmin, ymin);
+                // g.drawString(labels[Math.round(detection_classes[0][i])], xmin, ymin);
 
-               rectangle(matFrame,new opencv_core.Point(xmin,ymin), new opencv_core.Point(xmax,ymax), RED);
+                rectangle(matFrame, new opencv_core.Point(xmin, ymin), new opencv_core.Point(xmax, ymax), RED);
 
-               putText(matFrame, labels[(int) classes[bb]],new opencv_core.Point(xmin+2,ymin-2),FONT_HERSHEY_DUPLEX,1, GREEN);
+                putText(matFrame, labels[(int) classes[bb]], new opencv_core.Point(xmin + 2, ymin - 2), FONT_HERSHEY_DUPLEX, 1, GREEN);
 
 
+            }
+            //ImageIO.write(bi,"PNG",new File("images/result" + System.currentTimeMillis() + ".png"));
+
+
+            // imshow("Detected Window",matFrame);
 
         }
-        //ImageIO.write(bi,"PNG",new File("images/result" + System.currentTimeMillis() + ".png"));
-
-
-       // imshow("Detected Window",matFrame);
-
-
     }
     private boolean invalidData(Frame frame, opencv_core.Mat matFrame){
         return outputs == null || matFrame==null || frame == null;
