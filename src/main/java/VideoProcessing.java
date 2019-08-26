@@ -47,7 +47,7 @@ public class VideoProcessing {
 
         //Session sees = model.session();
         Session sees = models;
-         //sees.runner();
+         sees.runner();
 
 
         startYoloThread(sees,labels);

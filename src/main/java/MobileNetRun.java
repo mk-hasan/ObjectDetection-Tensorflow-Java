@@ -23,7 +23,8 @@ public class MobileNetRun {
         final String[] labels = detectObj.loadLabels(label);
 
 
-        //final String models = "/home/hasan/Downloads/frozen_darknet_yolov3_model.pb";
+       // final String models = "/home/hasan/Downloads/frozen_darknet_yolov3_model.pb";
+        //final String models = "/home/hasan/Desktop/saved_model.pb";
 
         final String imageName = "images/test.jpg";
         final String fileName2 = "images/videoSample2.mp4";

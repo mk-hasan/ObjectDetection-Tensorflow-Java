@@ -23,8 +23,11 @@
         <dependency>
             <groupId>org.tensorflow</groupId>
             <artifactId>tensorflow</artifactId>
-            <version>1.13.1</version>
+            <version>1.12.0-rc2</version>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.tensorflow/tensorflow-lite -->
+
         <!-- https://mvnrepository.com/artifact/org.tensorflow/libtensorflow -->
 
         <!-- https://mvnrepository.com/artifact/commons-io/commons-io -->
